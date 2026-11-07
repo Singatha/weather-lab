@@ -7,6 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY app ./app
+COPY performance ./performance
 
 FROM base AS development
 RUN pip install --no-cache-dir '.[dev]'

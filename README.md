@@ -1,8 +1,8 @@
 # Weather Lab
 
 A production-minded full-stack weather application built as a backend
-engineering learning project. This repository currently contains **Phase 5:
-Resilience Engineering**.
+engineering learning project. This repository currently contains **Phase 6:
+Testing and Observability**.
 
 ## What is implemented
 
@@ -28,7 +28,11 @@ Resilience Engineering**.
 - independent forecast and geocoding circuit breakers with half-open recovery
 - Redis-backed API rate limiting with a process-local degradation fallback
 - deterministic graceful shutdown for HTTP and Redis resources
+- JSON application logs with correlated `X-Request-ID` response headers
+- Prometheus HTTP, error, cache, and provider latency/outcome metrics
+- deterministic performance smoke target with a documented local baseline
 - Vitest/Testing Library, Playwright desktop/mobile, and Pytest test suites
+- CI coverage reports for both applications
 - ESLint, TypeScript, Ruff, and strict MyPy checks
 - Development and production Docker build stages
 - Docker Compose environment with web, API, and Redis services
@@ -55,6 +59,7 @@ Open:
 - API docs: <http://localhost:8000/docs>
 - Liveness: <http://localhost:8000/health/live>
 - Readiness: <http://localhost:8000/health/ready>
+- Metrics: <http://localhost:8000/metrics>
 - Location search: <http://localhost:8000/api/v1/locations/search?q=Berlin>
 - Berlin weather: <http://localhost:8000/api/v1/weather?latitude=52.52&longitude=13.41>
 
@@ -100,19 +105,23 @@ npx playwright install chromium
 npm run lint:web
 npm run typecheck:web
 npm run test:web
+npm run test:coverage:web
 npm run test:e2e
 npm run build:web
 
 # API
 cd apps/api
-../../.venv/bin/ruff check app tests
-../../.venv/bin/ruff format --check app tests
-../../.venv/bin/mypy app tests
+../../.venv/bin/ruff check app tests performance
+../../.venv/bin/ruff format --check app tests performance
+../../.venv/bin/mypy app tests performance
 ../../.venv/bin/pytest
+../../.venv/bin/pytest --cov=app --cov-report=term-missing
 
 # Orchestration
 cd ../..
 docker compose config --quiet
+docker compose up --detach --wait api
+docker compose exec -T api python -m performance.smoke --base-url http://127.0.0.1:8000
 ```
 
 Equivalent grouped commands are available as `make web-check`,
@@ -144,11 +153,13 @@ commit real credentials; this phase requires none.
 - [Architecture](docs/architecture.md)
 - [API contract](docs/api-contract.md)
 - [Testing strategy](docs/testing-strategy.md)
+- [Observability and performance](docs/observability.md)
 - [Architecture decisions](docs/decisions/0001-modular-monorepo.md)
 - [Provider and timezone decision](docs/decisions/0003-provider-boundary-and-timezones.md)
 - [Caching and stale fallback decision](docs/decisions/0004-cache-freshness-and-fallback.md)
 - [Frontend data and unit boundaries](docs/decisions/0005-frontend-data-and-unit-boundaries.md)
 - [Provider resilience and API rate limiting](docs/decisions/0006-provider-resilience-and-rate-limiting.md)
+- [App-local observability](docs/decisions/0007-app-local-observability.md)
 
 ## Git initialization
 
@@ -160,9 +171,9 @@ git init
 
 ## Next phase
 
-Phase 6 will expand automated coverage and add structured logging, request IDs,
-latency measurements, and operational metrics. It should begin only after
-explicit approval.
+Phase 7 will add production deployment configuration, operational runbooks, and
+the approved hosting target. It should begin only after explicit approval; no
+cloud provider has been selected.
 
 ## Data attribution
 

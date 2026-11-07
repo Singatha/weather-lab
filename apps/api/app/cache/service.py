@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError
 
 from app.cache.backend import CacheBackend
+from app.observability.metrics import ObservabilityMetrics
 
 CacheState = Literal["fresh", "stale", "miss", "unavailable"]
 
@@ -45,20 +46,24 @@ class CacheService:
         *,
         clock: Callable[[], datetime] | None = None,
         metrics: CacheMetrics | None = None,
+        observability: ObservabilityMetrics | None = None,
     ) -> None:
         self._backend = backend
         self._clock = clock or (lambda: datetime.now(UTC))
         self.metrics = metrics or CacheMetrics()
+        self._observability = observability
 
     async def get[T: BaseModel](self, key: str, model_type: type[T]) -> CacheLookup[T]:
         try:
             raw = await self._backend.get(key)
         except Exception:
             self.metrics.errors += 1
+            self._observe("get", "error")
             return CacheLookup(state="unavailable")
 
         if raw is None:
             self.metrics.misses += 1
+            self._observe("get", "miss")
             return CacheLookup(state="miss")
 
         try:
@@ -73,14 +78,17 @@ class CacheService:
         except (KeyError, TypeError, ValueError, ValidationError):
             self.metrics.errors += 1
             self.metrics.misses += 1
+            self._observe("get", "invalid")
             await self._delete_safely(key)
             return CacheLookup(state="miss")
 
         if self._clock() <= fresh_until:
             self.metrics.hits += 1
+            self._observe("get", "hit")
             return CacheLookup(state="fresh", value=value, stored_at=stored_at)
 
         self.metrics.stale_hits += 1
+        self._observe("get", "stale")
         return CacheLookup(state="stale", value=value, stored_at=stored_at)
 
     async def set(
@@ -109,16 +117,21 @@ class CacheService:
             )
         except Exception:
             self.metrics.errors += 1
+            self._observe("set", "error")
             return False
         self.metrics.writes += 1
+        self._observe("set", "success")
         return True
 
     async def ping(self) -> bool:
         try:
-            return await self._backend.ping()
+            available = await self._backend.ping()
         except Exception:
             self.metrics.errors += 1
+            self._observe("ping", "error")
             return False
+        self._observe("ping", "success" if available else "unavailable")
+        return available
 
     async def aclose(self) -> None:
         await self._backend.aclose()
@@ -128,3 +141,8 @@ class CacheService:
             await self._backend.delete(key)
         except Exception:
             self.metrics.errors += 1
+            self._observe("delete", "error")
+
+    def _observe(self, operation: str, result: str) -> None:
+        if self._observability is not None:
+            self._observability.observe_cache(operation=operation, result=result)

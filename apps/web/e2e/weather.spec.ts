@@ -48,6 +48,38 @@ test('shows a clear empty state', async ({ page }) => {
   await expect(page.getByText('No search result found!')).toBeVisible()
 })
 
+test('changes the hourly forecast day', async ({ page }) => {
+  const selector = page.getByRole('combobox', { name: /forecast day/i })
+
+  await selector.selectOption('2025-08-06')
+
+  await expect(selector).toHaveValue('2025-08-06')
+  await expect(selector.getByRole('option', { name: 'Wednesday' })).toHaveJSProperty(
+    'selected',
+    true,
+  )
+})
+
+test('recovers after an API error', async ({ page }) => {
+  await page.unroute('**/api/v1/weather?*')
+  await page.route('**/api/v1/weather?*', async (route) => {
+    await route.fulfill({
+      status: 503,
+      json: { error: { code: 'UPSTREAM_ERROR', message: 'Service unavailable' } },
+    })
+  })
+  await page.reload()
+  await expect(page.getByRole('alert')).toContainText('Something went wrong', { timeout: 5_000 })
+
+  await page.unroute('**/api/v1/weather?*')
+  await page.route('**/api/v1/weather?*', async (route) => {
+    await route.fulfill({ json: weatherFixture })
+  })
+  await page.getByRole('button', { name: /retry/i }).click()
+
+  await expect(page.getByRole('heading', { name: 'Berlin, Germany' })).toBeVisible()
+})
+
 test('has no detectable WCAG A or AA violations', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Berlin, Germany' })).toBeVisible()
   const results = await new AxeBuilder({ page })

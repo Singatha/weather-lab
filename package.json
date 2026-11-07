@@ -9,6 +9,7 @@
     "dev:web": "npm run dev --workspace @weather/web",
     "build:web": "npm run build --workspace @weather/web",
     "test:web": "npm run test --workspace @weather/web",
+    "test:coverage:web": "npm run test:coverage --workspace @weather/web",
     "test:e2e": "npm run test:e2e --workspace @weather/web",
     "lint:web": "npm run lint --workspace @weather/web",
     "typecheck:web": "npm run typecheck --workspace @weather/web"

@@ -2,6 +2,7 @@ import asyncio
 import random
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
+from time import perf_counter
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -9,12 +10,14 @@ import httpx
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.core.exceptions import (
+    ProviderCircuitOpenError,
     ProviderRateLimitError,
     ProviderRequestRejectedError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
+from app.observability.metrics import ObservabilityMetrics
 from app.providers.weather_codes import weather_condition
 from app.resilience.circuit_breaker import CircuitBreaker
 from app.resilience.retry import RetryPolicy, retry_async
@@ -110,6 +113,8 @@ class OpenMeteoProvider:
         geocoding_circuit: CircuitBreaker | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         randomizer: Callable[[], float] = random.random,
+        observability: ObservabilityMetrics | None = None,
+        clock: Callable[[], float] = perf_counter,
     ) -> None:
         self._client = client
         self._forecast_url = forecast_url
@@ -119,8 +124,16 @@ class OpenMeteoProvider:
         self._geocoding_circuit = geocoding_circuit or CircuitBreaker()
         self._sleep = sleep
         self._randomizer = randomizer
+        self._observability = observability
+        self._clock = clock
 
     async def search_locations(self, query: str, *, limit: int = 10) -> list[Location]:
+        return await self._observe_call(
+            "geocoding",
+            lambda: self._search_locations(query, limit=limit),
+        )
+
+    async def _search_locations(self, query: str, *, limit: int) -> list[Location]:
         payload = await self._get_json(
             self._geocoding_url,
             params={"name": query, "count": limit, "language": "en", "format": "json"},
@@ -152,6 +165,12 @@ class OpenMeteoProvider:
         return locations
 
     async def get_weather(self, latitude: float, longitude: float) -> WeatherResponse:
+        return await self._observe_call(
+            "forecast",
+            lambda: self._get_weather(latitude, longitude),
+        )
+
+    async def _get_weather(self, latitude: float, longitude: float) -> WeatherResponse:
         payload = await self._get_json(
             self._forecast_url,
             params={
@@ -311,6 +330,26 @@ class OpenMeteoProvider:
         await circuit.record_success()
         return payload
 
+    async def _observe_call[T](
+        self,
+        operation: str,
+        call: Callable[[], Awaitable[T]],
+    ) -> T:
+        started = self._clock()
+        outcome = "success"
+        try:
+            return await call()
+        except Exception as exc:
+            outcome = _provider_outcome(exc)
+            raise
+        finally:
+            if self._observability is not None:
+                self._observability.observe_provider(
+                    operation=operation,
+                    outcome=outcome,
+                    duration_seconds=self._clock() - started,
+                )
+
     async def _request_json(self, url: str, *, params: dict[str, Any]) -> dict[str, Any]:
         try:
             response = await self._client.get(url, params=params)
@@ -340,6 +379,22 @@ def _is_retryable(exc: Exception) -> bool:
         exc,
         (ProviderTimeoutError, ProviderRateLimitError, ProviderUnavailableError),
     )
+
+
+def _provider_outcome(exc: Exception) -> str:
+    if isinstance(exc, ProviderTimeoutError):
+        return "timeout"
+    if isinstance(exc, ProviderRateLimitError):
+        return "rate_limited"
+    if isinstance(exc, ProviderUnavailableError):
+        return "unavailable"
+    if isinstance(exc, ProviderRequestRejectedError):
+        return "rejected"
+    if isinstance(exc, ProviderResponseError):
+        return "invalid_response"
+    if isinstance(exc, ProviderCircuitOpenError):
+        return "circuit_open"
+    return "error"
 
 
 def _local_datetime(value: str, timezone: ZoneInfo) -> datetime:

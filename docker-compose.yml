@@ -27,6 +27,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       APP_NAME: ${APP_NAME:-Weather API}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       API_CORS_ORIGINS: '${API_CORS_ORIGINS:-["http://localhost:5173"]}'
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       REDIS_SOCKET_TIMEOUT_SECONDS: ${REDIS_SOCKET_TIMEOUT_SECONDS:-1}

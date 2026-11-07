@@ -21,7 +21,11 @@ jobs:
       - run: npm ci
       - run: npm run lint:web
       - run: npm run typecheck:web
-      - run: npm run test:web
+      - run: npm run test:coverage:web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: apps/web/coverage
       - run: npm run build:web
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
@@ -41,10 +45,14 @@ jobs:
           cache-dependency-path: apps/api/pyproject.toml
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
-      - run: ruff check app tests
-      - run: ruff format --check app tests
-      - run: mypy app tests
-      - run: pytest
+      - run: ruff check app tests performance
+      - run: ruff format --check app tests performance
+      - run: mypy app tests performance
+      - run: pytest --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: apps/api/coverage.xml
 
   containers:
     name: Container configuration
@@ -52,4 +60,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose config --quiet
+      - run: docker compose up --build --detach --wait api
+      - name: Performance smoke check
+        run: >-
+          docker compose exec -T api python -m performance.smoke
+          --base-url http://127.0.0.1:8000
+          --requests 100
+          --concurrency 20
+          --max-p95-ms 250
+      - if: always()
+        run: docker compose down
 

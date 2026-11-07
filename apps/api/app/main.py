@@ -8,12 +8,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 
 from app.api.health import router as health_router
+from app.api.metrics import router as metrics_router
 from app.api.v1.router import router as v1_router
 from app.cache.backend import RedisCacheBackend
 from app.cache.coalescing import RequestCoalescer
 from app.cache.service import CacheService
 from app.core.config import get_settings
 from app.core.error_handlers import register_error_handlers
+from app.observability.logging import configure_logging
+from app.observability.metrics import ObservabilityMetrics
+from app.observability.middleware import RequestObservabilityMiddleware
 from app.providers.open_meteo import OpenMeteoProvider
 from app.rate_limit.backend import RedisRateLimitBackend
 from app.rate_limit.middleware import RateLimitMiddleware
@@ -57,7 +61,13 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     cache: CacheService | None = None
     try:
         redis_client = _build_redis_client()
-        cache = CacheService(RedisCacheBackend(redis_client))
+        metrics: ObservabilityMetrics | None = getattr(
+            application.state, "observability_metrics", None
+        )
+        if metrics is None:
+            metrics = ObservabilityMetrics()
+            application.state.observability_metrics = metrics
+        cache = CacheService(RedisCacheBackend(redis_client), observability=metrics)
         retry_policy = RetryPolicy(
             max_attempts=settings.weather_provider_max_attempts,
             base_delay_seconds=settings.weather_provider_retry_base_delay_seconds,
@@ -77,6 +87,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
                 failure_threshold=settings.weather_provider_circuit_failure_threshold,
                 recovery_timeout_seconds=settings.weather_provider_circuit_recovery_seconds,
             ),
+            observability=metrics,
         )
         application.state.cache_service = cache
         application.state.rate_limiter = RateLimiter(
@@ -106,22 +117,28 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     """Build the ASGI application and register its dependencies."""
     settings = get_settings()
+    configure_logging(settings.log_level)
+    metrics = ObservabilityMetrics()
     application = FastAPI(
         title=settings.app_name,
-        version="0.5.0",
+        version="0.6.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
     )
     application.add_middleware(RateLimitMiddleware)
+    application.add_middleware(RequestObservabilityMiddleware, metrics=metrics)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=[str(origin).rstrip("/") for origin in settings.api_cors_origins],
         allow_credentials=False,
         allow_methods=["GET"],
-        allow_headers=["Accept", "Content-Type"],
+        allow_headers=["Accept", "Content-Type", "X-Request-ID"],
+        expose_headers=["X-Request-ID"],
     )
+    application.state.observability_metrics = metrics
     application.include_router(health_router)
+    application.include_router(metrics_router)
     application.include_router(v1_router)
     register_error_handlers(application)
     return application

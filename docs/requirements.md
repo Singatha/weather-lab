@@ -1,4 +1,4 @@
-# Implemented requirements through Phase 5
+# Implemented requirements through Phase 6
 
 ## Project foundation
 
@@ -60,11 +60,24 @@
 - lifespan-owned HTTP and Redis clients with best-effort complete shutdown
 - deterministic failure simulations for every Phase 5 policy
 
+## Testing and observability
+
+- expanded unit, integration, API contract, component, and browser coverage
+- loading, stale-data, empty, validation, provider failure, and retry scenarios
+- desktop and mobile Chromium E2E execution with deterministic network mocks
+- API and web coverage reports retained as CI artifacts
+- JSON application logs with bounded diagnostic context
+- validated/generated request IDs echoed in every response and correlated in logs
+- Prometheus HTTP request, error, and latency metrics using route templates
+- cache operation and provider outcome/latency metrics without sensitive keys
+- deterministic performance runner with a zero-error, p95-under-250-ms CI target
+- live provider requests kept outside the ordinary automated suite
+
 ## Explicitly deferred
 
-- structured logging, request IDs, latency metrics, and expanded observability
-- production deployment
+- production deployment and cloud selection
+- production dashboards, alerts, retention, and multi-worker metric aggregation
 
-This boundary keeps Phase 5 independently runnable while preserving
-observability and production operations for their dedicated phases.
+This boundary keeps Phase 6 independently runnable while preserving deployment
+and production operations for their dedicated phase.
 

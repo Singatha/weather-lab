@@ -49,10 +49,13 @@ async def test_location_search_endpoint_returns_normalized_results(
 
 async def test_weather_endpoint_returns_normalized_forecast(api_client: AsyncClient) -> None:
     response = await api_client.get(
-        "/api/v1/weather", params={"latitude": 52.52, "longitude": 13.41}
+        "/api/v1/weather",
+        params={"latitude": 52.52, "longitude": 13.41},
+        headers={"X-Request-ID": "api-contract-test"},
     )
 
     assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == "api-contract-test"
     body = response.json()
     assert body["current"]["temperature"] == 20
     assert body["daily"][0]["condition"]["category"] == "clear"
@@ -127,6 +130,8 @@ async def test_openapi_includes_versioned_endpoints_and_rate_limit_responses(
 
     assert response.status_code == 200
     paths = response.json()["paths"]
+    assert response.json()["info"]["version"] == "0.6.0"
     assert "/api/v1/locations/search" in paths
     assert "/api/v1/weather" in paths
     assert "429" in paths["/api/v1/weather"]["get"]["responses"]
+    assert "/metrics" not in paths

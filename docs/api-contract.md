@@ -1,7 +1,11 @@
-# API contract — Phase 5
+# API contract — Phase 6
 
 All application endpoints return JSON. Interactive OpenAPI documentation is
 available at `/docs`, with the machine-readable schema at `/openapi.json`.
+
+Every response includes `X-Request-ID`. A valid caller-supplied ID is echoed;
+otherwise the API generates a UUID. Clients should include this value in support
+or incident reports.
 
 ## `GET /health/live`
 
@@ -108,6 +112,13 @@ Exceeded quotas return `429`, set `Retry-After`, and use the standard error
 envelope. Health and documentation endpoints are not rate limited. Client
 identity uses the direct socket address; trusted-proxy forwarding configuration
 belongs to the deployment phase.
+
+## `GET /metrics`
+
+Returns the Prometheus text exposition for HTTP latency and errors, cache
+operations, and provider outcomes/latency. This operational endpoint is not
+included in OpenAPI and is not rate limited. Deployment controls for restricting
+scrape access belong to Phase 7.
 
 ## Error contract
 

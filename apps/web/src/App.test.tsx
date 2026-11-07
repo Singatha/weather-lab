@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { capeTown, weatherFixture } from './test/fixtures'
 
-function mockApi() {
+function mockApi(weather = weatherFixture) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const url = String(input)
     if (url.includes('/api/v1/weather')) {
-      return new Response(JSON.stringify(weatherFixture), {
+      return new Response(JSON.stringify(weather), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -40,6 +40,15 @@ function renderApp() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('App', () => {
+  it('renders a meaningful loading state while weather is pending', () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => undefined))
+
+    renderApp()
+
+    expect(screen.getByLabelText(/loading weather forecast/i)).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...')
+  })
+
   it('loads the default location and renders the complete forecast', async () => {
     mockApi()
     renderApp()
@@ -101,5 +110,39 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /^search$/i }))
 
     await waitFor(() => expect(screen.getByText(/no search result found/i)).toBeInTheDocument())
+  })
+
+  it('shows stale-data context when the API serves a saved forecast', async () => {
+    const staleWeather = {
+      ...weatherFixture,
+    mockApi(staleWeather)
+
+    renderApp()
+
+    expect(await screen.findByText(/showing the latest saved forecast/i)).toBeInTheDocument()
+  })
+
+  it('recovers from an API failure when retry succeeds', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 'UPSTREAM_ERROR', message: 'Service unavailable' } }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    renderApp()
+    expect(await screen.findByRole('alert', {}, { timeout: 4_000 })).toHaveTextContent(
+      /something went wrong/i,
+    )
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(weatherFixture), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+
+    expect(await screen.findByRole('heading', { name: 'Berlin, Germany' })).toBeInTheDocument()
   })
 })

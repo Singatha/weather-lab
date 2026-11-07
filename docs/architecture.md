@@ -1,11 +1,12 @@
 # Architecture
 
-## Phase 5 runtime
+## Phase 6 runtime
 
 ```mermaid
 flowchart LR
     Browser[Browser] --> Web[React + TanStack Query]
-    Web -->|Versioned REST / HTTP :8000| Limit[Rate-limit middleware]
+    Web -->|Versioned REST / HTTP :8000| Observe[Request ID + latency middleware]
+    Observe --> Limit[Rate-limit middleware]
     Limit --> Routes[FastAPI routes]
     Routes --> Service[Weather service]
     Service --> Cache[Cache service]
@@ -15,6 +16,10 @@ flowchart LR
     Circuit --> Retry[Bounded retry policy]
     Retry -->|HTTPS with bounded timeouts| OpenMeteo[Open-Meteo APIs]
     Limit --> RateRedis[Redis counter]
+    Observe --> Metrics[App-local Prometheus registry]
+    Cache --> Metrics
+    Provider --> Metrics
+    Observe --> Logs[Structured JSON logs]
 ```
 
 The repository is a modular monorepo with independently testable web and API
@@ -29,6 +34,8 @@ each application can also run directly on the host.
 - `apps/api/app/cache` owns keys, serialization, freshness, metrics, Redis, and
   request coalescing.
 - `apps/api/app/providers` owns the provider protocol and Open-Meteo translation.
+- `apps/api/app/observability` owns structured logs, request correlation, and
+  low-cardinality metrics.
 - `apps/api/app/schemas` owns stable application-facing contracts.
 - `infra/docker` owns container build definitions.
 - `docs` records current behavior and decisions.
@@ -52,4 +59,11 @@ silently serve stale location or expired weather data.
 Rate limiting runs before versioned routes and uses an atomic Redis fixed-window
 counter. If Redis fails, the limiter falls back to a process-local counter so a
 cache outage neither disables the API nor removes all abuse protection.
+
+The request observability middleware validates or creates a request ID, measures
+end-to-end latency, and records the resolved route template and response status.
+Cache and provider boundaries record bounded results without exposing queries,
+coordinates, payloads, or cache keys. Each application owns an isolated
+Prometheus registry, which keeps tests deterministic and makes the future
+multi-worker deployment choice explicit.
 
