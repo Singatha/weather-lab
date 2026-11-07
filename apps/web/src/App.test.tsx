@@ -115,6 +115,8 @@ describe('App', () => {
   it('shows stale-data context when the API serves a saved forecast', async () => {
     const staleWeather = {
       ...weatherFixture,
+      metadata: { ...weatherFixture.metadata, cache_status: 'stale' as const, is_stale: true },
+    }
     mockApi(staleWeather)
 
     renderApp()
