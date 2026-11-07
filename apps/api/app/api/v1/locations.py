@@ -12,7 +12,13 @@ router = APIRouter(prefix="/locations", tags=["locations"])
 @router.get(
     "/search",
     response_model=LocationSearchResponse,
-    responses={422: {"model": ErrorEnvelope}, 502: {"model": ErrorEnvelope}},
+    responses={
+        422: {"model": ErrorEnvelope},
+        429: {"model": ErrorEnvelope},
+        502: {"model": ErrorEnvelope},
+        503: {"model": ErrorEnvelope},
+        504: {"model": ErrorEnvelope},
+    },
     summary="Search for locations",
 )
 async def search_locations(

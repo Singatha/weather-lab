@@ -1,3 +1,6 @@
+import asyncio
+import random
+from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -7,11 +10,14 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.core.exceptions import (
     ProviderRateLimitError,
+    ProviderRequestRejectedError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
 from app.providers.weather_codes import weather_condition
+from app.resilience.circuit_breaker import CircuitBreaker
+from app.resilience.retry import RetryPolicy, retry_async
 from app.schemas.location import Location
 from app.schemas.weather import (
     CurrentWeather,
@@ -99,15 +105,26 @@ class OpenMeteoProvider:
         *,
         forecast_url: str,
         geocoding_url: str,
+        retry_policy: RetryPolicy | None = None,
+        forecast_circuit: CircuitBreaker | None = None,
+        geocoding_circuit: CircuitBreaker | None = None,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        randomizer: Callable[[], float] = random.random,
     ) -> None:
         self._client = client
         self._forecast_url = forecast_url
         self._geocoding_url = geocoding_url
+        self._retry_policy = retry_policy or RetryPolicy()
+        self._forecast_circuit = forecast_circuit or CircuitBreaker()
+        self._geocoding_circuit = geocoding_circuit or CircuitBreaker()
+        self._sleep = sleep
+        self._randomizer = randomizer
 
     async def search_locations(self, query: str, *, limit: int = 10) -> list[Location]:
         payload = await self._get_json(
             self._geocoding_url,
             params={"name": query, "count": limit, "language": "en", "format": "json"},
+            circuit=self._geocoding_circuit,
         )
         try:
             response = _GeocodingResponse.model_validate(payload)
@@ -179,6 +196,7 @@ class OpenMeteoProvider:
                     )
                 ),
             },
+            circuit=self._forecast_circuit,
         )
         try:
             response = _ForecastResponse.model_validate(payload)
@@ -268,7 +286,32 @@ class OpenMeteoProvider:
             for index in range(len(payload.time))
         ]
 
-    async def _get_json(self, url: str, *, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any],
+        circuit: CircuitBreaker,
+    ) -> dict[str, Any]:
+        await circuit.before_call()
+        try:
+            payload = await retry_async(
+                lambda: self._request_json(url, params=params),
+                policy=self._retry_policy,
+                is_retryable=_is_retryable,
+                sleep=self._sleep,
+                randomizer=self._randomizer,
+            )
+        except Exception as exc:
+            if _is_retryable(exc):
+                await circuit.record_failure()
+            else:
+                await circuit.record_success()
+            raise
+        await circuit.record_success()
+        return payload
+
+    async def _request_json(self, url: str, *, params: dict[str, Any]) -> dict[str, Any]:
         try:
             response = await self._client.get(url, params=params)
         except httpx.TimeoutException as exc:
@@ -278,10 +321,10 @@ class OpenMeteoProvider:
 
         if response.status_code == 429:
             raise ProviderRateLimitError()
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise ProviderUnavailableError() from exc
+        if response.status_code in {408, 425} or response.status_code >= 500:
+            raise ProviderUnavailableError()
+        if response.is_error:
+            raise ProviderRequestRejectedError()
 
         try:
             payload = response.json()
@@ -290,6 +333,13 @@ class OpenMeteoProvider:
         if not isinstance(payload, dict):
             raise ProviderResponseError()
         return payload
+
+
+def _is_retryable(exc: Exception) -> bool:
+    return isinstance(
+        exc,
+        (ProviderTimeoutError, ProviderRateLimitError, ProviderUnavailableError),
+    )
 
 
 def _local_datetime(value: str, timezone: ZoneInfo) -> datetime:

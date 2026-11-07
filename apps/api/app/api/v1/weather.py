@@ -14,6 +14,7 @@ router = APIRouter(prefix="/weather", tags=["weather"])
     response_model=WeatherResponse,
     responses={
         422: {"model": ErrorEnvelope},
+        429: {"model": ErrorEnvelope},
         502: {"model": ErrorEnvelope},
         503: {"model": ErrorEnvelope},
         504: {"model": ErrorEnvelope},

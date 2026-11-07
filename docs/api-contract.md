@@ -1,4 +1,4 @@
-# API contract — Phase 3
+# API contract — Phase 5
 
 All application endpoints return JSON. Interactive OpenAPI documentation is
 available at `/docs`, with the machine-readable schema at `/openapi.json`.
@@ -94,6 +94,21 @@ the UI categories `clear`, `partly_cloudy`, `overcast`, `fog`, `drizzle`,
 `metadata.is_stale` is true only for stale fallback. `cached_at` records when a
 successfully cached weather response was written.
 
+## Rate limiting
+
+`/api/v1/*` responses include:
+
+| Header | Meaning |
+| --- | --- |
+| `X-RateLimit-Limit` | Configured request quota |
+| `X-RateLimit-Remaining` | Requests left in the current fixed window |
+| `X-RateLimit-Reset` | Seconds until the current window resets |
+
+Exceeded quotas return `429`, set `Retry-After`, and use the standard error
+envelope. Health and documentation endpoints are not rate limited. Client
+identity uses the direct socket address; trusted-proxy forwarding configuration
+belongs to the deployment phase.
+
 ## Error contract
 
 Expected failures use one envelope:
@@ -111,11 +126,16 @@ Expected failures use one envelope:
 | Status | Code | Meaning |
 | --- | --- | --- |
 | `422` | `VALIDATION_ERROR` | Query or coordinate validation failed |
+| `429` | `RATE_LIMIT_EXCEEDED` | Client quota was exhausted |
 | `502` | `WEATHER_PROVIDER_UNAVAILABLE` | Provider connection or HTTP failure |
+| `502` | `WEATHER_PROVIDER_REQUEST_REJECTED` | Provider rejected a non-retryable request |
 | `502` | `INVALID_PROVIDER_RESPONSE` | Provider payload failed validation |
 | `503` | `WEATHER_PROVIDER_RATE_LIMITED` | Provider returned a rate limit |
+| `503` | `WEATHER_PROVIDER_CIRCUIT_OPEN` | Provider calls are paused during recovery |
 | `504` | `WEATHER_PROVIDER_TIMEOUT` | Configured provider timeout elapsed |
 | `500` | `INTERNAL_ERROR` | Unexpected server error |
 
-Retries, circuit breaking, and public API rate limiting belong to Phase 5.
+Eligible provider failures are attempted no more than the configured total
+attempt count. A retained stale weather response may replace a provider error;
+location searches and uncached weather requests preserve the error contract.
 

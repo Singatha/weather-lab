@@ -36,13 +36,31 @@ class ProviderRateLimitError(ProviderError):
     default_message = "The weather provider is temporarily rate limited."
 
 
+class ProviderCircuitOpenError(ProviderError):
+    status_code = 503
+    code = "WEATHER_PROVIDER_CIRCUIT_OPEN"
+    default_message = "The weather provider is temporarily unavailable while it recovers."
+
+
 class ProviderUnavailableError(ProviderError):
     status_code = 502
     code = "WEATHER_PROVIDER_UNAVAILABLE"
     default_message = "The weather provider is currently unavailable."
 
 
+class ProviderRequestRejectedError(ProviderError):
+    status_code = 502
+    code = "WEATHER_PROVIDER_REQUEST_REJECTED"
+    default_message = "The weather provider rejected the upstream request."
+
+
 class ProviderResponseError(ProviderError):
     status_code = 502
     code = "INVALID_PROVIDER_RESPONSE"
     default_message = "The weather provider returned an invalid response."
+
+
+class RateLimitExceededError(ApplicationError):
+    status_code = 429
+    code = "RATE_LIMIT_EXCEEDED"
+    default_message = "Too many requests. Please try again shortly."

@@ -1,16 +1,20 @@
 # Architecture
 
-## Phase 4 runtime
+## Phase 5 runtime
 
 ```mermaid
 flowchart LR
     Browser[Browser] --> Web[React + TanStack Query]
-    Web -->|Versioned REST / HTTP :8000| Routes[FastAPI routes]
+    Web -->|Versioned REST / HTTP :8000| Limit[Rate-limit middleware]
+    Limit --> Routes[FastAPI routes]
     Routes --> Service[Weather service]
     Service --> Cache[Cache service]
     Cache --> Redis[(Redis)]
     Service --> Provider[Weather provider protocol]
-    Provider -->|HTTPS| OpenMeteo[Open-Meteo APIs]
+    Provider --> Circuit[Forecast or geocoding circuit]
+    Circuit --> Retry[Bounded retry policy]
+    Retry -->|HTTPS with bounded timeouts| OpenMeteo[Open-Meteo APIs]
+    Limit --> RateRedis[Redis counter]
 ```
 
 The repository is a modular monorepo with independently testable web and API
@@ -38,4 +42,14 @@ The browser treats FastAPI as its only weather data source. TanStack Query owns
 location and forecast request state and cancellation. The API remains canonical
 in Celsius, km/h, and millimeters; pure frontend formatters apply the selected
 display units without issuing redundant weather requests.
+
+Transient provider calls are retried inside their operation-specific circuit.
+One exhausted logical call records one circuit failure. An open circuit fails
+fast until its recovery interval permits one half-open probe. `WeatherService`
+continues to own the stale-data decision, so resilience transport policy cannot
+silently serve stale location or expired weather data.
+
+Rate limiting runs before versioned routes and uses an atomic Redis fixed-window
+counter. If Redis fails, the limiter falls back to a process-local counter so a
+cache outage neither disables the API nor removes all abuse protection.
 

@@ -1,8 +1,8 @@
 # Weather Lab
 
 A production-minded full-stack weather application built as a backend
-engineering learning project. This repository currently contains **Phase 4:
-Frontend Implementation**.
+engineering learning project. This repository currently contains **Phase 5:
+Resilience Engineering**.
 
 ## What is implemented
 
@@ -23,6 +23,11 @@ Frontend Implementation**.
 - fresh, stale, miss, hit, and cache-bypass weather metadata
 - stale weather fallback when Open-Meteo is unavailable
 - graceful cache degradation and concurrent request coalescing
+- separate provider connection, read, write, and pool timeouts
+- bounded transient retries with exponential backoff and jitter
+- independent forecast and geocoding circuit breakers with half-open recovery
+- Redis-backed API rate limiting with a process-local degradation fallback
+- deterministic graceful shutdown for HTTP and Redis resources
 - Vitest/Testing Library, Playwright desktop/mobile, and Pytest test suites
 - ESLint, TypeScript, Ruff, and strict MyPy checks
 - Development and production Docker build stages
@@ -143,6 +148,7 @@ commit real credentials; this phase requires none.
 - [Provider and timezone decision](docs/decisions/0003-provider-boundary-and-timezones.md)
 - [Caching and stale fallback decision](docs/decisions/0004-cache-freshness-and-fallback.md)
 - [Frontend data and unit boundaries](docs/decisions/0005-frontend-data-and-unit-boundaries.md)
+- [Provider resilience and API rate limiting](docs/decisions/0006-provider-resilience-and-rate-limiting.md)
 
 ## Git initialization
 
@@ -154,9 +160,9 @@ git init
 
 ## Next phase
 
-Phase 5 will add bounded retries, exponential backoff with jitter, circuit
-breaking, request rate limiting, and provider-failure resilience. It should
-begin only after explicit approval.
+Phase 6 will expand automated coverage and add structured logging, request IDs,
+latency measurements, and operational metrics. It should begin only after
+explicit approval.
 
 ## Data attribution
 

@@ -1,4 +1,4 @@
-# Implemented requirements through Phase 4
+# Implemented requirements through Phase 5
 
 ## Project foundation
 
@@ -46,11 +46,25 @@
 - weather loading skeleton, provider error/retry, and stale-cache messaging
 - deterministic component tests plus desktop and mobile Playwright flows
 
+## Resilience engineering
+
+- independent HTTP connection, read, write, and pool timeouts
+- finite retries only for timeouts, transport errors, rate limits, and transient statuses
+- capped exponential backoff with configurable positive jitter
+- independent forecast and geocoding consecutive-failure circuit breakers
+- open, half-open single-probe, recovered, and reopened circuit transitions
+- retained stale weather returned for provider and open-circuit failures only
+- atomic Redis fixed-window API rate limiting by direct client address
+- process-local rate-limit fallback when Redis is unavailable
+- consistent `429` error envelopes and rate-limit response headers
+- lifespan-owned HTTP and Redis clients with best-effort complete shutdown
+- deterministic failure simulations for every Phase 5 policy
+
 ## Explicitly deferred
 
-- retries, circuit breaking, rate limiting, and observability
+- structured logging, request IDs, latency metrics, and expanded observability
 - production deployment
 
-This boundary keeps Phase 4 independently runnable while preserving resilience
-and production operations for their dedicated phases.
+This boundary keeps Phase 5 independently runnable while preserving
+observability and production operations for their dedicated phases.
 

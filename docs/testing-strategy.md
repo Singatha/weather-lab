@@ -25,10 +25,16 @@ fresh and stale transitions, retention TTLs, corrupt values, Redis failures,
 cache metadata, location caching, and concurrent miss coalescing. A separate
 manual Compose smoke test validates the redis-py adapter against real Redis.
 
+Phase 5 failure simulations use deterministic clocks, sleepers, randomizers,
+HTTPX transports, and in-memory counters. They cover retry eligibility and
+limits, exact backoff delays, every circuit transition, one-probe half-open
+behavior, stale-data permissions, Redis rate-limit fallback, `429` middleware
+contracts, separate HTTP timeouts, and complete lifespan cleanup.
+
 Docker Compose configuration is validated separately so orchestration mistakes
 fail before containers are started.
 
 Ordinary tests do not make live Open-Meteo or Redis requests. Provider, API,
-component, and browser fixtures remain deterministic. Resilience coverage will
-be introduced alongside the Phase 5 policies it protects.
+component, and browser fixtures remain deterministic. Observability coverage
+will be introduced alongside the Phase 6 instrumentation it protects.
 

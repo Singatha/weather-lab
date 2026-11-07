@@ -5,7 +5,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.dependencies import get_weather_service
 from app.cache.service import CacheService
-from app.core.exceptions import ProviderTimeoutError
+from app.core.exceptions import ProviderCircuitOpenError, ProviderTimeoutError
 from app.main import app
 from app.providers.base import WeatherProvider
 from app.schemas.location import Location
@@ -101,7 +101,26 @@ async def test_provider_timeout_uses_consistent_error_contract(
     }
 
 
-async def test_openapi_includes_versioned_phase_two_endpoints(
+async def test_open_circuit_uses_consistent_error_contract(
+    api_client: AsyncClient,
+) -> None:
+    class OpenCircuitProvider(StubProvider):
+        async def get_weather(self, latitude: float, longitude: float) -> WeatherResponse:
+            del latitude, longitude
+            raise ProviderCircuitOpenError()
+
+    app.dependency_overrides[get_weather_service] = lambda: WeatherService(
+        OpenCircuitProvider(), CacheService(InMemoryCacheBackend())
+    )
+    response = await api_client.get(
+        "/api/v1/weather", params={"latitude": 52.52, "longitude": 13.41}
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "WEATHER_PROVIDER_CIRCUIT_OPEN"
+
+
+async def test_openapi_includes_versioned_endpoints_and_rate_limit_responses(
     api_client: AsyncClient,
 ) -> None:
     response = await api_client.get("/openapi.json")
@@ -110,3 +129,4 @@ async def test_openapi_includes_versioned_phase_two_endpoints(
     paths = response.json()["paths"]
     assert "/api/v1/locations/search" in paths
     assert "/api/v1/weather" in paths
+    assert "429" in paths["/api/v1/weather"]["get"]["responses"]

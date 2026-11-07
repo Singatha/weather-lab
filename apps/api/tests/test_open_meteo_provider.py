@@ -4,11 +4,16 @@ import httpx
 import pytest
 
 from app.core.exceptions import (
+    ProviderCircuitOpenError,
     ProviderRateLimitError,
+    ProviderRequestRejectedError,
     ProviderResponseError,
     ProviderTimeoutError,
+    ProviderUnavailableError,
 )
 from app.providers.open_meteo import OpenMeteoProvider
+from app.resilience.circuit_breaker import CircuitBreaker, CircuitState
+from app.resilience.retry import RetryPolicy
 from tests.fixtures.provider_payloads import forecast_payload, geocoding_payload
 
 
@@ -17,6 +22,7 @@ def _provider(client: httpx.AsyncClient) -> OpenMeteoProvider:
         client,
         forecast_url="https://provider.test/v1/forecast",
         geocoding_url="https://provider.test/v1/search",
+        retry_policy=RetryPolicy(max_attempts=1),
     )
 
 
@@ -97,6 +103,99 @@ async def test_provider_rate_limit_is_translated() -> None:
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(ProviderRateLimitError):
             await _provider(client).get_weather(52.52, 13.41)
+
+
+@pytest.mark.asyncio
+async def test_transient_failures_retry_with_exponential_backoff_and_jitter() -> None:
+    attempts = 0
+    delays: list[float] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            return httpx.Response(503, json={})
+        return httpx.Response(200, json=geocoding_payload())
+
+    async def record_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenMeteoProvider(
+            client,
+            forecast_url="https://provider.test/v1/forecast",
+            geocoding_url="https://provider.test/v1/search",
+            retry_policy=RetryPolicy(
+                max_attempts=3,
+                base_delay_seconds=0.5,
+                max_delay_seconds=2,
+                jitter_ratio=0.5,
+            ),
+            sleep=record_sleep,
+            randomizer=lambda: 0.4,
+        )
+        locations = await provider.search_locations("Berlin")
+
+    assert locations[0].name == "Berlin"
+    assert attempts == 3
+    assert delays == pytest.approx([0.6, 1.2])
+
+
+@pytest.mark.asyncio
+async def test_non_retryable_provider_rejection_is_attempted_once() -> None:
+    attempts = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(400, json={})
+
+    async def sleeper(_delay: float) -> None:
+        raise AssertionError("non-retryable response must not sleep")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenMeteoProvider(
+            client,
+            forecast_url="https://provider.test/v1/forecast",
+            geocoding_url="https://provider.test/v1/search",
+            retry_policy=RetryPolicy(max_attempts=3),
+            sleep=sleeper,
+        )
+        with pytest.raises(ProviderRequestRejectedError):
+            await provider.search_locations("Berlin")
+
+    assert attempts == 1
+
+
+@pytest.mark.asyncio
+async def test_exhausted_retries_open_circuit_and_next_call_fails_fast() -> None:
+    attempts = 0
+    breaker = CircuitBreaker(failure_threshold=1, recovery_timeout_seconds=30)
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(503, json={})
+
+    async def no_wait(_delay: float) -> None:
+        return None
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenMeteoProvider(
+            client,
+            forecast_url="https://provider.test/v1/forecast",
+            geocoding_url="https://provider.test/v1/search",
+            retry_policy=RetryPolicy(max_attempts=2, base_delay_seconds=0),
+            geocoding_circuit=breaker,
+            sleep=no_wait,
+        )
+        with pytest.raises(ProviderUnavailableError):
+            await provider.search_locations("Berlin")
+        with pytest.raises(ProviderCircuitOpenError):
+            await provider.search_locations("Berlin")
+
+    assert attempts == 2
+    assert breaker.state is CircuitState.OPEN
 
 
 @pytest.mark.asyncio
