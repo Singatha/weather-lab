@@ -23,6 +23,8 @@ jobs:
       - run: npm run typecheck:web
       - run: npm run test:web
       - run: npm run build:web
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
 
   api:
     name: API checks

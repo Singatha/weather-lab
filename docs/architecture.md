@@ -1,11 +1,11 @@
 # Architecture
 
-## Phase 3 runtime
+## Phase 4 runtime
 
 ```mermaid
 flowchart LR
-    Browser[Browser] -->|HTTP :5173| Web[React + Vite]
-    Web -. Phase 4 REST calls .->|HTTP :8000| Routes[FastAPI routes]
+    Browser[Browser] --> Web[React + TanStack Query]
+    Web -->|Versioned REST / HTTP :8000| Routes[FastAPI routes]
     Routes --> Service[Weather service]
     Service --> Cache[Cache service]
     Cache --> Redis[(Redis)]
@@ -33,4 +33,9 @@ The service uses cache-aside reads. Fresh Redis values return immediately.
 Stale weather values are retained but used only after a provider failure. Cache
 I/O failures fall through to Open-Meteo. Same-key misses are coalesced within
 each API process and recheck Redis after acquiring the lock.
+
+The browser treats FastAPI as its only weather data source. TanStack Query owns
+location and forecast request state and cancellation. The API remains canonical
+in Celsius, km/h, and millimeters; pure frontend formatters apply the selected
+display units without issuing redundant weather requests.
 

@@ -1,7 +1,7 @@
 # Configuration
 
 Copy `.env.example` to `.env` for local overrides. Defaults are suitable for
-Docker Compose and no secrets are required through Phase 3.
+Docker Compose and no secrets are required through Phase 4.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |

@@ -1,12 +1,16 @@
 # Weather Lab
 
 A production-minded full-stack weather application built as a backend
-engineering learning project. This repository currently contains **Phase 3:
-Redis Caching**.
+engineering learning project. This repository currently contains **Phase 4:
+Frontend Implementation**.
 
 ## What is implemented
 
-- React 19, TypeScript, Vite, Tailwind CSS, and TanStack Query application shell
+- responsive React 19, TypeScript, Vite, Tailwind CSS, and TanStack Query weather dashboard
+- debounced, keyboard-accessible location suggestions backed by FastAPI
+- current conditions, four weather metrics, seven-day cards, and day-selectable hourly forecasts
+- independent and one-click metric/imperial measurement controls
+- supplied local fonts, backgrounds, weather icons, loading, empty, stale, and API error states
 - FastAPI service with typed Pydantic Settings
 - `GET /health/live` and `GET /health/ready`
 - `GET /api/v1/locations/search?q=Berlin`
@@ -19,13 +23,11 @@ Redis Caching**.
 - fresh, stale, miss, hit, and cache-bypass weather metadata
 - stale weather fallback when Open-Meteo is unavailable
 - graceful cache degradation and concurrent request coalescing
-- Vitest/Testing Library and Pytest test suites
+- Vitest/Testing Library, Playwright desktop/mobile, and Pytest test suites
 - ESLint, TypeScript, Ruff, and strict MyPy checks
 - Development and production Docker build stages
 - Docker Compose environment with web, API, and Redis services
 - GitHub Actions validation for both applications and Compose
-
-The final weather dashboard is intentionally deferred to Phase 4.
 
 ## Prerequisites
 
@@ -82,11 +84,18 @@ commands instead of the Unix-style `.venv/bin/...` paths.
 
 ## Quality checks
 
+Install the Playwright browser once before running the end-to-end suite:
+
+```bash
+npx playwright install chromium
+```
+
 ```bash
 # Web
 npm run lint:web
 npm run typecheck:web
 npm run test:web
+npm run test:e2e
 npm run build:web
 
 # API
@@ -133,6 +142,7 @@ commit real credentials; this phase requires none.
 - [Architecture decisions](docs/decisions/0001-modular-monorepo.md)
 - [Provider and timezone decision](docs/decisions/0003-provider-boundary-and-timezones.md)
 - [Caching and stale fallback decision](docs/decisions/0004-cache-freshness-and-fallback.md)
+- [Frontend data and unit boundaries](docs/decisions/0005-frontend-data-and-unit-boundaries.md)
 
 ## Git initialization
 
@@ -144,9 +154,9 @@ git init
 
 ## Next phase
 
-Phase 4 will implement the supplied Frontend Mentor weather interface, location
-suggestions, forecast views, unit switching, responsive behavior, and browser
-tests. It should begin only after explicit approval.
+Phase 5 will add bounded retries, exponential backoff with jitter, circuit
+breaking, request rate limiting, and provider-failure resilience. It should
+begin only after explicit approval.
 
 ## Data attribution
 

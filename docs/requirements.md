@@ -1,4 +1,4 @@
-# Implemented requirements through Phase 3
+# Implemented requirements through Phase 4
 
 ## Project foundation
 
@@ -34,12 +34,23 @@
 - readiness reporting for healthy or degraded Redis
 - deterministic cache, failure, TTL, and concurrency tests
 
+## Frontend application
+
+- supplied Frontend Mentor desktop and mobile design reproduced with bundled assets and fonts
+- debounced FastAPI location search with suggestions, empty results, and in-progress feedback
+- keyboard navigation for suggestions and semantic, labelled controls
+- current weather, feels-like, humidity, wind, and precipitation metrics
+- seven-day forecasts and day-selectable hourly forecasts
+- client-side metric and imperial conversions from canonical backend units
+- responsive desktop, tablet, and mobile layouts from 320 pixels upward
+- weather loading skeleton, provider error/retry, and stale-cache messaging
+- deterministic component tests plus desktop and mobile Playwright flows
+
 ## Explicitly deferred
 
-- the supplied Frontend Mentor dashboard design
 - retries, circuit breaking, rate limiting, and observability
 - production deployment
 
-This boundary keeps Phase 3 independently runnable while preserving the final
-interface and resilience policies for their dedicated phases.
+This boundary keeps Phase 4 independently runnable while preserving resilience
+and production operations for their dedicated phases.
 

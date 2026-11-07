@@ -1,4 +1,4 @@
-.PHONY: dev up down web-install web-dev web-test web-check api-install api-dev api-test api-check compose-config
+.PHONY: dev up down web-install web-dev web-test web-e2e web-check api-install api-dev api-test api-check compose-config
 
 dev: up
 
@@ -17,11 +17,15 @@ web-dev:
 web-test:
 	npm run test:web
 
+web-e2e:
+	npm run test:e2e
+
 web-check:
 	npm run lint:web
 	npm run typecheck:web
 	npm run test:web
 	npm run build:web
+	npm run test:e2e
 
 api-install:
 	python3.12 -m venv .venv
