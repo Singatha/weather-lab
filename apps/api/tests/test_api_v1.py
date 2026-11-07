@@ -4,6 +4,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.api.dependencies import get_weather_service
+from app.cache.service import CacheService
 from app.core.exceptions import ProviderTimeoutError
 from app.main import app
 from app.providers.base import WeatherProvider
@@ -11,6 +12,7 @@ from app.schemas.location import Location
 from app.schemas.weather import WeatherResponse
 from app.services.weather import WeatherService
 from tests.factories import location, weather_response
+from tests.fakes import InMemoryCacheBackend
 
 
 class StubProvider(WeatherProvider):
@@ -25,7 +27,9 @@ class StubProvider(WeatherProvider):
 
 @pytest_asyncio.fixture
 async def api_client() -> AsyncIterator[AsyncClient]:
-    app.dependency_overrides[get_weather_service] = lambda: WeatherService(StubProvider())
+    app.dependency_overrides[get_weather_service] = lambda: WeatherService(
+        StubProvider(), CacheService(InMemoryCacheBackend())
+    )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
@@ -81,7 +85,9 @@ async def test_provider_timeout_uses_consistent_error_contract(
             del latitude, longitude
             raise ProviderTimeoutError()
 
-    app.dependency_overrides[get_weather_service] = lambda: WeatherService(TimeoutProvider())
+    app.dependency_overrides[get_weather_service] = lambda: WeatherService(
+        TimeoutProvider(), CacheService(InMemoryCacheBackend())
+    )
     response = await api_client.get(
         "/api/v1/weather", params={"latitude": 52.52, "longitude": 13.41}
     )

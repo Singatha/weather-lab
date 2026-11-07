@@ -1,4 +1,4 @@
-# API contract — Phase 2
+# API contract — Phase 3
 
 All application endpoints return JSON. Interactive OpenAPI documentation is
 available at `/docs`, with the machine-readable schema at `/openapi.json`.
@@ -13,11 +13,11 @@ Confirms that the API process can serve requests.
 
 ## `GET /health/ready`
 
-Confirms that application initialization completed. Redis is not an API runtime
-dependency until Phase 3.
+Confirms that application initialization completed. Redis is degradable, so an
+unavailable cache is reported without making the endpoint fail.
 
 ```json
-{"status": "ready"}
+{"status": "ready", "dependencies": {"redis": "ok"}}
 ```
 
 ## `GET /api/v1/locations/search`
@@ -76,15 +76,23 @@ Top-level response fields:
 | `hourly` | Timezone-aware hourly forecast values |
 | `daily` | Seven local forecast dates with high/low, precipitation, sunrise, and sunset |
 | `units` | Canonical units: Celsius, km/h, mm, and percent |
-| `metadata` | Provider timing, fetch time, and Phase 2 cache status |
+| `metadata` | Provider timing, fetch time, cache state, and stale state |
 
 `condition` contains the numeric WMO code, an English description, and one of
 the UI categories `clear`, `partly_cloudy`, `overcast`, `fog`, `drizzle`,
 `rain`, `snow`, `storm`, or `unknown`.
 
-Phase 2 always returns `metadata.cache_status` as `not_cached` and
-`metadata.is_stale` as `false`. Phase 3 will extend this metadata when Redis is
-integrated.
+`metadata.cache_status` has these values:
+
+| Value | Meaning |
+| --- | --- |
+| `miss` | Open-Meteo was called and the response was cached |
+| `hit` | A fresh Redis value was returned |
+| `stale` | Open-Meteo failed and a retained stale value was returned |
+| `bypass` | Redis failed, so fresh provider data was returned without caching |
+
+`metadata.is_stale` is true only for stale fallback. `cached_at` records when a
+successfully cached weather response was written.
 
 ## Error contract
 
@@ -109,6 +117,5 @@ Expected failures use one envelope:
 | `504` | `WEATHER_PROVIDER_TIMEOUT` | Configured provider timeout elapsed |
 | `500` | `INTERNAL_ERROR` | Unexpected server error |
 
-Retries, circuit breaking, public API rate limiting, and stale fallback belong
-to later phases.
+Retries, circuit breaking, and public API rate limiting belong to Phase 5.
 

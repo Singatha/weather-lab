@@ -1,15 +1,16 @@
 # Architecture
 
-## Phase 2 runtime
+## Phase 3 runtime
 
 ```mermaid
 flowchart LR
     Browser[Browser] -->|HTTP :5173| Web[React + Vite]
     Web -. Phase 4 REST calls .->|HTTP :8000| Routes[FastAPI routes]
     Routes --> Service[Weather service]
+    Service --> Cache[Cache service]
+    Cache --> Redis[(Redis)]
     Service --> Provider[Weather provider protocol]
     Provider -->|HTTPS| OpenMeteo[Open-Meteo APIs]
-    Service -. Phase 3 .-> Redis[(Redis)]
 ```
 
 The repository is a modular monorepo with independently testable web and API
@@ -21,12 +22,15 @@ each application can also run directly on the host.
 - `apps/web` owns browser rendering and frontend server state.
 - `apps/api/app/api` owns versioned HTTP routing and dependency wiring.
 - `apps/api/app/services` owns application use cases.
+- `apps/api/app/cache` owns keys, serialization, freshness, metrics, Redis, and
+  request coalescing.
 - `apps/api/app/providers` owns the provider protocol and Open-Meteo translation.
 - `apps/api/app/schemas` owns stable application-facing contracts.
 - `infra/docker` owns container build definitions.
 - `docs` records current behavior and decisions.
 
-The frontend never consumes Open-Meteo payloads directly. Provider responses
-are validated and translated before reaching routes. Cache modules remain
-absent until Phase 3 gives them real behavior.
+The service uses cache-aside reads. Fresh Redis values return immediately.
+Stale weather values are retained but used only after a provider failure. Cache
+I/O failures fall through to Open-Meteo. Same-key misses are coalesced within
+each API process and recheck Redis after acquiring the lock.
 

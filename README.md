@@ -1,8 +1,8 @@
 # Weather Lab
 
 A production-minded full-stack weather application built as a backend
-engineering learning project. This repository currently contains **Phase 2:
-Weather API Integration**.
+engineering learning project. This repository currently contains **Phase 3:
+Redis Caching**.
 
 ## What is implemented
 
@@ -15,14 +15,17 @@ Weather API Integration**.
 - Normalized current, hourly, and seven-day weather response schemas
 - IANA-timezone-aware timestamps and WMO condition mapping
 - Consistent validation and upstream-provider error responses
+- Redis-backed location and weather caching with configurable TTLs
+- fresh, stale, miss, hit, and cache-bypass weather metadata
+- stale weather fallback when Open-Meteo is unavailable
+- graceful cache degradation and concurrent request coalescing
 - Vitest/Testing Library and Pytest test suites
 - ESLint, TypeScript, Ruff, and strict MyPy checks
 - Development and production Docker build stages
 - Docker Compose environment with web, API, and Redis services
 - GitHub Actions validation for both applications and Compose
 
-Redis caching behavior and the final weather dashboard are intentionally not
-part of this phase.
+The final weather dashboard is intentionally deferred to Phase 4.
 
 ## Prerequisites
 
@@ -129,6 +132,7 @@ commit real credentials; this phase requires none.
 - [Testing strategy](docs/testing-strategy.md)
 - [Architecture decisions](docs/decisions/0001-modular-monorepo.md)
 - [Provider and timezone decision](docs/decisions/0003-provider-boundary-and-timezones.md)
+- [Caching and stale fallback decision](docs/decisions/0004-cache-freshness-and-fallback.md)
 
 ## Git initialization
 
@@ -140,9 +144,9 @@ git init
 
 ## Next phase
 
-Phase 3 will introduce Redis-backed location and weather caching, configurable
-TTLs, cache keys, cache failure tolerance, stale data support, and automated
-cache behavior tests. It should begin only after explicit approval.
+Phase 4 will implement the supplied Frontend Mentor weather interface, location
+suggestions, forecast views, unit switching, responsive behavior, and browser
+tests. It should begin only after explicit approval.
 
 ## Data attribution
 

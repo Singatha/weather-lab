@@ -77,8 +77,9 @@ class WeatherMetadata(BaseModel):
     provider: Literal["open-meteo"] = "open-meteo"
     fetched_at: datetime
     provider_generation_time_ms: float = Field(ge=0)
-    cache_status: Literal["not_cached"] = "not_cached"
-    is_stale: Literal[False] = False
+    cache_status: Literal["not_cached", "miss", "hit", "stale", "bypass"] = "not_cached"
+    is_stale: bool = False
+    cached_at: datetime | None = None
 
 
 class WeatherResponse(BaseModel):
