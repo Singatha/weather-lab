@@ -29,6 +29,9 @@ services:
       APP_NAME: ${APP_NAME:-Weather API}
       API_CORS_ORIGINS: '${API_CORS_ORIGINS:-["http://localhost:5173"]}'
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      OPEN_METEO_FORECAST_URL: ${OPEN_METEO_FORECAST_URL:-https://api.open-meteo.com/v1/forecast}
+      OPEN_METEO_GEOCODING_URL: ${OPEN_METEO_GEOCODING_URL:-https://geocoding-api.open-meteo.com/v1/search}
+      WEATHER_PROVIDER_TIMEOUT_SECONDS: ${WEATHER_PROVIDER_TIMEOUT_SECONDS:-10}
     ports:
       - "8000:8000"
     volumes:

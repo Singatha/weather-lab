@@ -1,28 +1,33 @@
-# Phase 1 requirements
+# Implemented requirements through Phase 2
 
-## Scope
+## Project foundation
 
-Phase 1 establishes a runnable, testable development foundation. It includes:
+- React, TypeScript, Vite, Tailwind CSS, and TanStack Query web shell
+- Python 3.12 FastAPI service configured with Pydantic Settings
+- liveness and readiness endpoints
+- Vitest, Pytest, Ruff, MyPy, and ESLint configuration
+- local Docker images and Docker Compose orchestration with Redis
+- basic CI workflow and development documentation
 
-- a React, TypeScript, Vite, Tailwind CSS, and TanStack Query web shell;
-- a Python 3.12 FastAPI service configured with Pydantic Settings;
-- liveness and readiness HTTP endpoints;
-- Vitest, Pytest, Ruff, MyPy, and ESLint configuration;
-- local Docker images and Docker Compose orchestration with Redis;
-- a basic CI workflow and development documentation.
+## Weather API integration
+
+- asynchronous Open-Meteo forecast and geocoding integration
+- provider protocol isolating vendor response formats
+- versioned location search and weather endpoints
+- normalized location, current, hourly, daily, unit, and metadata schemas
+- coordinate and search-query validation
+- WMO weather descriptions and UI-oriented categories
+- IANA timezone localization for current, hourly, sunrise, and sunset values
+- structured validation, timeout, rate-limit, availability, and response errors
+- deterministic route, provider, schema, and mapping tests
 
 ## Explicitly deferred
 
-The following requirements are documented in the master brief but are not
-implemented in Phase 1:
+- application-level Redis caching and stale-data behavior
+- the supplied Frontend Mentor dashboard design
+- retries, circuit breaking, rate limiting, and observability
+- production deployment
 
-- Open-Meteo and geocoding integration;
-- application-level Redis caching;
-- weather API endpoints and normalized forecast schemas;
-- the supplied Frontend Mentor dashboard design;
-- retries, circuit breaking, rate limiting, and observability;
-- production deployment.
-
-This boundary preserves a working deliverable while keeping later design and
-reliability decisions tied to concrete use cases.
+This boundary keeps Phase 2 independently runnable while preserving caching
+and resilience for their dedicated implementation phases.
 

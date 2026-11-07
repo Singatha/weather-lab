@@ -7,15 +7,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY app ./app
-RUN pip install --no-cache-dir .
 
 FROM base AS development
-COPY tests ./tests
 RUN pip install --no-cache-dir '.[dev]'
+COPY tests ./tests
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 FROM base AS production
+RUN pip install --no-cache-dir .
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

@@ -1,22 +1,28 @@
 # Weather Lab
 
 A production-minded full-stack weather application built as a backend
-engineering learning project. This repository currently contains **Phase 1:
-Project Foundation** only.
+engineering learning project. This repository currently contains **Phase 2:
+Weather API Integration**.
 
 ## What is implemented
 
 - React 19, TypeScript, Vite, Tailwind CSS, and TanStack Query application shell
 - FastAPI service with typed Pydantic Settings
 - `GET /health/live` and `GET /health/ready`
+- `GET /api/v1/locations/search?q=Berlin`
+- `GET /api/v1/weather?latitude=52.52&longitude=13.41`
+- Open-Meteo adapter behind an application-owned provider protocol
+- Normalized current, hourly, and seven-day weather response schemas
+- IANA-timezone-aware timestamps and WMO condition mapping
+- Consistent validation and upstream-provider error responses
 - Vitest/Testing Library and Pytest test suites
 - ESLint, TypeScript, Ruff, and strict MyPy checks
 - Development and production Docker build stages
 - Docker Compose environment with web, API, and Redis services
 - GitHub Actions validation for both applications and Compose
 
-Open-Meteo integration, caching behavior, and the final weather dashboard are
-intentionally not part of this phase.
+Redis caching behavior and the final weather dashboard are intentionally not
+part of this phase.
 
 ## Prerequisites
 
@@ -39,6 +45,8 @@ Open:
 - API docs: <http://localhost:8000/docs>
 - Liveness: <http://localhost:8000/health/live>
 - Readiness: <http://localhost:8000/health/ready>
+- Location search: <http://localhost:8000/api/v1/locations/search?q=Berlin>
+- Berlin weather: <http://localhost:8000/api/v1/weather?latitude=52.52&longitude=13.41>
 
 Stop the environment with:
 
@@ -110,16 +118,17 @@ Equivalent grouped commands are available as `make web-check`,
 ## Configuration
 
 Copy `.env.example` to `.env` and override values as needed. See
-[configuration](docs/configuration.md) for the complete Phase 1 table. Never
+[configuration](docs/configuration.md) for the complete configuration table. Never
 commit real credentials; this phase requires none.
 
 ## Documentation
 
-- [Phase 1 requirements](docs/requirements.md)
+- [Implemented requirements](docs/requirements.md)
 - [Architecture](docs/architecture.md)
 - [API contract](docs/api-contract.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [Architecture decisions](docs/decisions/0001-modular-monorepo.md)
+- [Provider and timezone decision](docs/decisions/0003-provider-boundary-and-timezones.md)
 
 ## Git initialization
 
@@ -131,7 +140,13 @@ git init
 
 ## Next phase
 
-Phase 2 will introduce the Open-Meteo provider abstraction, geocoding and
-weather endpoints, normalized schemas, timezone handling, and provider tests.
-It should begin only after explicit approval.
+Phase 3 will introduce Redis-backed location and weather caching, configurable
+TTLs, cache keys, cache failure tolerance, stale data support, and automated
+cache behavior tests. It should begin only after explicit approval.
+
+## Data attribution
+
+Weather data is provided by [Open-Meteo](https://open-meteo.com/). Location
+search data is based on GeoNames and delivered through the Open-Meteo
+Geocoding API. Review their current licensing terms before commercial use.
 
