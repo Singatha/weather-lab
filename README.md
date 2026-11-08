@@ -85,9 +85,9 @@ Docker host and uses local HTTPS on `localhost` for verification:
 
 ```bash
 cp .env.production.example .env.production
-mkdir -p secrets
-umask 077
+install -m 700 -d secrets
 openssl rand -hex 32 > secrets/redis_password.txt
+chmod 444 secrets/redis_password.txt
 docker compose --env-file .env.production -f compose.production.yml \
   up --build --detach --wait
 curl --fail --insecure https://localhost/health/live
@@ -175,7 +175,9 @@ Equivalent grouped commands are available as `make web-check`,
 Copy `.env.example` to `.env` for development or `.env.production.example` to
 `.env.production` for production. See [configuration](docs/configuration.md) for
 the complete table. Production requires a random Redis password under the
-ignored `secrets/` directory; never commit the environment copy or secret.
+ignored mode-0700 `secrets/` directory. Its mode-0444 password file is readable
+by the non-root containers through a read-only bind mount while the enclosing
+host directory prevents access by other host users. Never commit either file.
 
 ## Documentation
 

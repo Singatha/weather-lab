@@ -25,9 +25,9 @@ need `--insecure` unless the local CA is trusted.
 
 ```bash
 cp .env.production.example .env.production
-mkdir -p secrets
-umask 077
+install -m 700 -d secrets
 openssl rand -hex 32 > secrets/redis_password.txt
+chmod 444 secrets/redis_password.txt
 
 docker compose --env-file .env.production -f compose.production.yml \
   up --build --detach --wait
@@ -55,7 +55,11 @@ Add `--volumes` only for an intentional full data reset.
    - `PUBLIC_ORIGIN` to the matching `https://` origin
    - `IMAGE_PREFIX` to `ghcr.io/<owner>/<repository>` when using published images
    - `IMAGE_TAG` to an exact release version or commit SHA
-6. Generate `secrets/redis_password.txt` with mode `0600` and a random value.
+6. Create `secrets/` with mode `0700`, generate a random
+   `secrets/redis_password.txt`, and set the file to mode `0444`. File-backed
+   Compose secrets retain host ownership on Linux, so the read-only file must be
+   readable by the non-root API and Redis containers; the enclosing directory
+   prevents other host users from accessing it.
 7. Authenticate the host to GHCR if the packages are private.
 8. Start the exact published images:
 

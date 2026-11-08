@@ -73,7 +73,8 @@ when provider rate limits and cold-start traffic have been considered.
 
 ## Secret rotation
 
-1. Generate a new random Redis password into a temporary mode-0600 file.
+1. Generate a new random Redis password into a temporary file inside the
+   mode-0700 `secrets/` directory, then set the file to mode `0444`.
 2. Stop `api` and `redis` during the short maintenance window.
 3. Replace `secrets/redis_password.txt` atomically on the host.
 4. Recreate Redis and API with `docker compose up --detach --force-recreate
