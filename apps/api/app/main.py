@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
@@ -13,7 +14,7 @@ from app.api.v1.router import router as v1_router
 from app.cache.backend import RedisCacheBackend
 from app.cache.coalescing import RequestCoalescer
 from app.cache.service import CacheService
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.error_handlers import register_error_handlers
 from app.observability.logging import configure_logging
 from app.observability.metrics import ObservabilityMetrics
@@ -46,11 +47,30 @@ def _build_redis_client() -> Redis:
     settings = get_settings()
     return Redis.from_url(
         str(settings.redis_url),
+        password=_redis_password(settings),
         decode_responses=True,
         socket_connect_timeout=settings.redis_socket_timeout_seconds,
         socket_timeout=settings.redis_socket_timeout_seconds,
         max_connections=settings.redis_max_connections,
     )
+
+
+def _redis_password(settings: Settings) -> str | None:
+    if settings.redis_password_file is not None:
+        return _read_secret(settings.redis_password_file, name="Redis password")
+    if settings.redis_password is not None:
+        return settings.redis_password.get_secret_value()
+    return None
+
+
+def _read_secret(path: Path, *, name: str) -> str:
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise RuntimeError(f"{name} file could not be read") from exc
+    if not value:
+        raise RuntimeError(f"{name} file must not be empty")
+    return value
 
 
 @asynccontextmanager
@@ -121,7 +141,7 @@ def create_app() -> FastAPI:
     metrics = ObservabilityMetrics()
     application = FastAPI(
         title=settings.app_name,
-        version="0.6.0",
+        version="0.7.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,

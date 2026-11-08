@@ -1,5 +1,5 @@
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from app.core.config import Settings
 
@@ -17,4 +17,12 @@ def test_keepalive_pool_must_not_exceed_total_connections() -> None:
         Settings(
             weather_provider_max_connections=5,
             weather_provider_max_keepalive_connections=6,
+        )
+
+
+def test_redis_password_sources_are_mutually_exclusive() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            redis_password=SecretStr("environment-secret"),
+            redis_password_file="/run/secrets/redis_password",
         )

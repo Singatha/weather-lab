@@ -60,6 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose config --quiet
+      - run: docker compose --env-file .env.production.example -f compose.production.yml config --quiet
       - run: docker compose up --build --detach --wait api
       - name: Performance smoke check
         run: >-
@@ -70,4 +71,30 @@ jobs:
           --max-p95-ms 250
       - if: always()
         run: docker compose down
+
+  production-smoke:
+    name: Production stack smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create ephemeral Redis secret
+        run: |
+          mkdir -p secrets
+          openssl rand -hex 32 > secrets/redis_password.txt
+          chmod 600 secrets/redis_password.txt
+      - name: Start production stack
+        run: >-
+          docker compose --env-file .env.production.example
+          -f compose.production.yml up --build --detach --wait
+      - name: Verify HTTPS frontend and API routing
+        run: |
+          curl --fail --insecure --silent --show-error https://localhost/ > /dev/null
+          curl --fail --insecure --silent --show-error https://localhost/health/live | grep -q '"status":"ok"'
+          test "$(curl --insecure --silent --output /dev/null --write-out '%{http_code}' https://localhost/api/v1/weather)" = "422"
+          test "$(curl --insecure --silent --output /dev/null --write-out '%{http_code}' https://localhost/metrics)" = "404"
+          test "$(curl --insecure --silent --output /dev/null --write-out '%{http_code}' https://localhost/openapi.json)" = "404"
+      - if: always()
+        run: >-
+          docker compose --env-file .env.production.example
+          -f compose.production.yml down --volumes
 

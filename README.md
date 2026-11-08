@@ -1,8 +1,8 @@
 # Weather Lab
 
 A production-minded full-stack weather application built as a backend
-engineering learning project. This repository currently contains **Phase 6:
-Testing and Observability**.
+engineering learning project. This repository contains the completed **Phase 7:
+Deployment and Documentation** scope.
 
 ## What is implemented
 
@@ -37,6 +37,12 @@ Testing and Observability**.
 - Development and production Docker build stages
 - Docker Compose environment with web, API, and Redis services
 - GitHub Actions validation for both applications and Compose
+- hardened, non-root production API and web images with built-in health checks
+- provider-neutral production Compose stack with private origin/data networks
+- same-origin routing and automatic HTTPS through Caddy
+- authenticated, persistent, memory-bounded Redis configured through a file secret
+- GHCR release images, immutable SHA tags, attestations, and optional SSH deployment
+- deployment, rollback, backup, monitoring, secret-rotation, and incident runbooks
 
 ## Prerequisites
 
@@ -71,6 +77,27 @@ docker compose down
 
 Add `--volumes` only when you intentionally want to remove local Redis and
 Node dependency volumes.
+
+## Production-like deployment
+
+No cloud provider is assumed. The portable stack runs on any suitable Linux
+Docker host and uses local HTTPS on `localhost` for verification:
+
+```bash
+cp .env.production.example .env.production
+mkdir -p secrets
+umask 077
+openssl rand -hex 32 > secrets/redis_password.txt
+docker compose --env-file .env.production -f compose.production.yml \
+  up --build --detach --wait
+curl --fail --insecure https://localhost/health/live
+```
+
+Only Caddy publishes ports. The built frontend calls the API on the same HTTPS
+origin; API port 8000, Redis port 6379, metrics, and API documentation stay
+private. For a public hostname, configure DNS, set `APP_DOMAIN` and
+`PUBLIC_ORIGIN`, and open TCP 80/443 plus UDP 443. See the
+[deployment guide](docs/deployment.md) before using a remote host.
 
 ## Run on the host
 
@@ -120,6 +147,7 @@ cd apps/api
 # Orchestration
 cd ../..
 docker compose config --quiet
+docker compose --env-file .env.production.example -f compose.production.yml config --quiet
 docker compose up --detach --wait api
 docker compose exec -T api python -m performance.smoke --base-url http://127.0.0.1:8000
 ```
@@ -135,17 +163,19 @@ Equivalent grouped commands are available as `make web-check`,
 │   ├── api/                 # FastAPI application and tests
 │   └── web/                 # React application and tests
 ├── docs/                    # Current requirements, architecture, and ADRs
-├── infra/docker/            # Container build definitions
-├── .github/workflows/ci.yml # Continuous integration
+├── infra/                   # Docker, Caddy, and Nginx production configuration
+├── .github/workflows/       # CI plus image release/deployment automation
+├── compose.production.yml   # Portable production topology
 ├── docker-compose.yml
 └── Makefile
 ```
 
 ## Configuration
 
-Copy `.env.example` to `.env` and override values as needed. See
-[configuration](docs/configuration.md) for the complete configuration table. Never
-commit real credentials; this phase requires none.
+Copy `.env.example` to `.env` for development or `.env.production.example` to
+`.env.production` for production. See [configuration](docs/configuration.md) for
+the complete table. Production requires a random Redis password under the
+ignored `secrets/` directory; never commit the environment copy or secret.
 
 ## Documentation
 
@@ -154,12 +184,15 @@ commit real credentials; this phase requires none.
 - [API contract](docs/api-contract.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [Observability and performance](docs/observability.md)
+- [Portable deployment](docs/deployment.md)
+- [Operations runbook](docs/operations.md)
 - [Architecture decisions](docs/decisions/0001-modular-monorepo.md)
 - [Provider and timezone decision](docs/decisions/0003-provider-boundary-and-timezones.md)
 - [Caching and stale fallback decision](docs/decisions/0004-cache-freshness-and-fallback.md)
 - [Frontend data and unit boundaries](docs/decisions/0005-frontend-data-and-unit-boundaries.md)
 - [Provider resilience and API rate limiting](docs/decisions/0006-provider-resilience-and-rate-limiting.md)
 - [App-local observability](docs/decisions/0007-app-local-observability.md)
+- [Portable production deployment](docs/decisions/0008-portable-production-compose.md)
 
 ## Git initialization
 
@@ -169,11 +202,12 @@ If this directory was supplied without repository metadata, initialize it once:
 git init
 ```
 
-## Next phase
+## Deployment status
 
-Phase 7 will add production deployment configuration, operational runbooks, and
-the approved hosting target. It should begin only after explicit approval; no
-cloud provider has been selected.
+The repository includes a tested production-like deployment and cloud-neutral
+release pipeline. It does not provision or mutate external infrastructure. A
+public deployment still requires an explicitly approved provider, domain, host,
+firewall policy, and GitHub production-environment configuration.
 
 ## Data attribution
 

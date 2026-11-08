@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import cast
 
 import httpx
@@ -6,6 +7,7 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 
 import app.main as main_module
+from app.core.config import Settings
 
 
 class FakeHttpClient:
@@ -65,3 +67,20 @@ async def test_http_client_uses_separate_bounded_timeouts() -> None:
         assert client.timeout.pool == 3
     finally:
         await client.aclose()
+
+
+def test_redis_password_is_loaded_from_secret_file(tmp_path: Path) -> None:
+    secret_file = tmp_path / "redis_password"
+    secret_file.write_text("production-secret\n", encoding="utf-8")
+
+    password = main_module._redis_password(Settings(redis_password_file=secret_file))
+
+    assert password == "production-secret"
+
+
+def test_empty_redis_password_file_is_rejected(tmp_path: Path) -> None:
+    secret_file = tmp_path / "redis_password"
+    secret_file.write_text("\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="must not be empty"):
+        main_module._redis_password(Settings(redis_password_file=secret_file))

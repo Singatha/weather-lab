@@ -1,11 +1,12 @@
 # Architecture
 
-## Phase 6 runtime
+## Phase 7 production runtime
 
 ```mermaid
 flowchart LR
-    Browser[Browser] --> Web[React + TanStack Query]
-    Web -->|Versioned REST / HTTP :8000| Observe[Request ID + latency middleware]
+    Browser[Browser] -->|HTTPS| Edge[Caddy TLS edge]
+    Edge -->|Static routes| Web[Nginx + React bundle]
+    Edge -->|/api and /health| Observe[Request ID + latency middleware]
     Observe --> Limit[Rate-limit middleware]
     Limit --> Routes[FastAPI routes]
     Routes --> Service[Weather service]
@@ -20,11 +21,21 @@ flowchart LR
     Cache --> Metrics
     Provider --> Metrics
     Observe --> Logs[Structured JSON logs]
+    Actions[GitHub Actions] -->|Immutable images + attestations| GHCR[(GHCR)]
+    GHCR -->|Exact tag pull| Host[Provider-neutral Docker host]
+    Host --> Edge
 ```
 
 The repository is a modular monorepo with independently testable web and API
 applications. Docker Compose supplies a reproducible local environment while
 each application can also run directly on the host.
+
+The production Compose project is separate from development. Caddy is the only
+service with host ports and maintains HTTPS state in persistent volumes. Nginx,
+FastAPI, and Redis have no source mounts or public ports. Edge traffic reaches
+web and API on one network; Redis is isolated with API on an internal data
+network. This makes the browser's API origin relative and removes deployment-time
+cross-origin coupling.
 
 ## Boundaries
 
@@ -38,6 +49,8 @@ each application can also run directly on the host.
   low-cardinality metrics.
 - `apps/api/app/schemas` owns stable application-facing contracts.
 - `infra/docker` owns container build definitions.
+- `infra/caddy` and `infra/nginx` own production edge and static-origin policy.
+- `compose.production.yml` owns the portable production topology and hardening.
 - `docs` records current behavior and decisions.
 
 The service uses cache-aside reads. Fresh Redis values return immediately.
@@ -66,4 +79,23 @@ Cache and provider boundaries record bounded results without exposing queries,
 coordinates, payloads, or cache keys. Each application owns an isolated
 Prometheus registry, which keeps tests deterministic and makes the future
 multi-worker deployment choice explicit.
+
+## Deployment boundary
+
+Production images use read-only root filesystems, non-root API/web users,
+dropped Linux capabilities, explicit temporary filesystems, health checks, and
+immutable application contents. Redis receives its password through a file
+secret, keeps AOF data on a named volume, and evicts least-recently-used keys at
+its configured memory ceiling.
+
+The API deliberately remains a single worker because Prometheus metrics and
+request coalescing are process-local. Caddy trusts and forwards client metadata;
+Uvicorn accepts those headers only within a topology where API port 8000 is not
+published. Metrics and interactive API documentation are not routed through the
+public edge.
+
+GitHub Actions builds and attests API/web images for GHCR. Deployment is an
+opt-in protected-environment step to a pre-provisioned Docker host. Cloud account,
+network, DNS, firewall, backup storage, and high-availability provisioning remain
+outside the repository until a provider is explicitly approved.
 

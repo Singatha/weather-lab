@@ -1,4 +1,4 @@
-# Implemented requirements through Phase 6
+# Implemented requirements through Phase 7
 
 ## Project foundation
 
@@ -73,11 +73,29 @@
 - deterministic performance runner with a zero-error, p95-under-250-ms CI target
 - live provider requests kept outside the ordinary automated suite
 
-## Explicitly deferred
+## Deployment and operations
 
-- production deployment and cloud selection
-- production dashboards, alerts, retention, and multi-worker metric aggregation
+- separate production Docker targets for non-root API and static web processes
+- provider-neutral production Compose topology with no source bind mounts
+- same-origin frontend/API routing through a single Caddy HTTPS edge
+- automatic public-certificate provisioning and HTTP-to-HTTPS redirects
+- private API and Redis networks with no direct host port publication
+- authenticated, memory-bounded Redis with AOF persistence on a named volume
+- file-mounted Redis credentials supported without secret environment variables
+- read-only root filesystems, dropped capabilities, and no-new-privileges controls
+- image, service, and routed liveness/readiness health checks
+- GHCR image publication with immutable SHA tags and artifact attestations
+- optional protected-environment SSH deployment to a pre-provisioned Docker host
+- documented bootstrap, monitoring, backup, rotation, rollback, and incident flows
+- CI production-stack build and HTTPS smoke verification
 
-This boundary keeps Phase 6 independently runnable while preserving deployment
-and production operations for their dedicated phase.
+## Future infrastructure decisions
+
+- cloud provider and infrastructure-as-code implementation
+- highly available multi-host orchestration and managed Redis
+- production dashboards, alert delivery, retention, and centralized log storage
+- multi-worker or horizontal metric aggregation
+
+These decisions require traffic, availability, budget, jurisdiction, and hosting
+requirements that are outside the approved provider-neutral Phase 7 scope.
 

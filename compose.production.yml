@@ -1,0 +1,176 @@
+name: weather-lab-production
+
+services:
+  edge:
+    image: caddy:2.11.9-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:2019/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      - edge
+
+  web:
+    image: ${IMAGE_PREFIX:-weather-lab}-web:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      target: production
+      args:
+        VITE_API_BASE_URL: ""
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - edge
+
+  api:
+    image: ${IMAGE_PREFIX:-weather-lab}-api:${IMAGE_TAG:-local}
+    build:
+      context: ./apps/api
+      dockerfile: ../../infra/docker/api.Dockerfile
+      target: production
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_NAME: ${APP_NAME:-Weather API}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_CORS_ORIGINS: '["${PUBLIC_ORIGIN:-https://localhost}"]'
+      REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      REDIS_SOCKET_TIMEOUT_SECONDS: ${REDIS_SOCKET_TIMEOUT_SECONDS:-1}
+      REDIS_MAX_CONNECTIONS: ${REDIS_MAX_CONNECTIONS:-20}
+      LOCATION_CACHE_TTL_SECONDS: ${LOCATION_CACHE_TTL_SECONDS:-86400}
+      WEATHER_CACHE_TTL_SECONDS: ${WEATHER_CACHE_TTL_SECONDS:-900}
+      WEATHER_CACHE_STALE_TTL_SECONDS: ${WEATHER_CACHE_STALE_TTL_SECONDS:-7200}
+      OPEN_METEO_FORECAST_URL: ${OPEN_METEO_FORECAST_URL:-https://api.open-meteo.com/v1/forecast}
+      OPEN_METEO_GEOCODING_URL: ${OPEN_METEO_GEOCODING_URL:-https://geocoding-api.open-meteo.com/v1/search}
+      WEATHER_PROVIDER_CONNECT_TIMEOUT_SECONDS: ${WEATHER_PROVIDER_CONNECT_TIMEOUT_SECONDS:-3}
+      WEATHER_PROVIDER_READ_TIMEOUT_SECONDS: ${WEATHER_PROVIDER_READ_TIMEOUT_SECONDS:-10}
+      WEATHER_PROVIDER_WRITE_TIMEOUT_SECONDS: ${WEATHER_PROVIDER_WRITE_TIMEOUT_SECONDS:-5}
+      WEATHER_PROVIDER_POOL_TIMEOUT_SECONDS: ${WEATHER_PROVIDER_POOL_TIMEOUT_SECONDS:-3}
+      WEATHER_PROVIDER_MAX_CONNECTIONS: ${WEATHER_PROVIDER_MAX_CONNECTIONS:-20}
+      WEATHER_PROVIDER_MAX_KEEPALIVE_CONNECTIONS: ${WEATHER_PROVIDER_MAX_KEEPALIVE_CONNECTIONS:-10}
+      WEATHER_PROVIDER_MAX_ATTEMPTS: ${WEATHER_PROVIDER_MAX_ATTEMPTS:-3}
+      WEATHER_PROVIDER_RETRY_BASE_DELAY_SECONDS: ${WEATHER_PROVIDER_RETRY_BASE_DELAY_SECONDS:-0.2}
+      WEATHER_PROVIDER_RETRY_MAX_DELAY_SECONDS: ${WEATHER_PROVIDER_RETRY_MAX_DELAY_SECONDS:-2}
+      WEATHER_PROVIDER_RETRY_JITTER_RATIO: ${WEATHER_PROVIDER_RETRY_JITTER_RATIO:-0.25}
+      WEATHER_PROVIDER_CIRCUIT_FAILURE_THRESHOLD: ${WEATHER_PROVIDER_CIRCUIT_FAILURE_THRESHOLD:-5}
+      WEATHER_PROVIDER_CIRCUIT_RECOVERY_SECONDS: ${WEATHER_PROVIDER_CIRCUIT_RECOVERY_SECONDS:-30}
+      API_RATE_LIMIT_REQUESTS: ${API_RATE_LIMIT_REQUESTS:-60}
+      API_RATE_LIMIT_WINDOW_SECONDS: ${API_RATE_LIMIT_WINDOW_SECONDS:-60}
+    secrets:
+      - redis_password
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    stop_grace_period: 20s
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - edge
+      - data
+
+  redis:
+    image: redis:7.4.12-alpine3.21
+    user: redis
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        exec redis-server \
+          --appendonly yes \
+          --appendfsync everysec \
+          --maxmemory "$${REDIS_MAXMEMORY}" \
+          --maxmemory-policy allkeys-lru \
+          --requirepass "$$(cat /run/secrets/redis_password)"
+    environment:
+      REDIS_MAXMEMORY: ${REDIS_MAXMEMORY:-256mb}
+    secrets:
+      - redis_password
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'REDISCLI_AUTH="$$(cat /run/secrets/redis_password)" redis-cli ping | grep -q PONG'
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - data
+
+secrets:
+  redis_password:
+    file: ${REDIS_PASSWORD_FILE_PATH:-./secrets/redis_password.txt}
+
+volumes:
+  caddy_data:
+  caddy_config:
+  redis_data:
+
+networks:
+  edge:
+  data:
+    internal: true

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import (
@@ -8,6 +9,7 @@ from pydantic import (
     PositiveFloat,
     PositiveInt,
     RedisDsn,
+    SecretStr,
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,6 +32,8 @@ class Settings(BaseSettings):
         default_factory=lambda: [AnyHttpUrl("http://localhost:5173")]
     )
     redis_url: RedisDsn = RedisDsn("redis://localhost:6379/0")
+    redis_password: SecretStr | None = None
+    redis_password_file: Path | None = None
     redis_socket_timeout_seconds: PositiveFloat = 1.0
     redis_max_connections: PositiveInt = 20
     location_cache_ttl_seconds: PositiveInt = 86400
@@ -56,6 +60,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_cache_ttls(self) -> "Settings":
+        if self.redis_password is not None and self.redis_password_file is not None:
+            raise ValueError("Configure only one of redis_password or redis_password_file")
         if self.weather_cache_stale_ttl_seconds < self.weather_cache_ttl_seconds:
             raise ValueError(
                 "weather_cache_stale_ttl_seconds must be greater than or equal to "

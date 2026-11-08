@@ -1,7 +1,8 @@
 # Configuration
 
 Copy `.env.example` to `.env` for local overrides. Defaults are suitable for
-Docker Compose and no secrets are required through Phase 6.
+Docker Compose development. Production uses `.env.production` plus a file-mounted
+Redis password; start from `.env.production.example` and never commit the copy.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
@@ -10,6 +11,8 @@ Docker Compose and no secrets are required through Phase 6.
 | `LOG_LEVEL` | Structured application log threshold | `INFO` |
 | `API_CORS_ORIGINS` | JSON list of allowed browser origins | `["http://localhost:5173"]` |
 | `REDIS_URL` | Cache connection URL | `redis://redis:6379/0` in Compose |
+| `REDIS_PASSWORD` | Optional Redis password supplied directly; prefer a file in production | unset |
+| `REDIS_PASSWORD_FILE` | Password file inside the API container | unset |
 | `REDIS_SOCKET_TIMEOUT_SECONDS` | Redis connect and command timeout | `1` |
 | `REDIS_MAX_CONNECTIONS` | Maximum process-local Redis connections | `20` |
 | `LOCATION_CACHE_TTL_SECONDS` | Location search freshness and retention | `86400` |
@@ -40,4 +43,28 @@ changing application code.
 The retry maximum delay must be at least the base delay. Keepalive connections
 must not exceed the total provider connection limit. `WEATHER_PROVIDER_MAX_ATTEMPTS`
 includes the first attempt, so the default permits at most two retries.
+
+`REDIS_PASSWORD` and `REDIS_PASSWORD_FILE` are mutually exclusive. Production
+sets only `REDIS_PASSWORD_FILE=/run/secrets/redis_password`; Docker Compose mounts
+that path read-only for API and Redis.
+
+## Production orchestration variables
+
+These variables are consumed by `compose.production.yml`, not directly by the
+FastAPI settings model.
+
+| Variable | Purpose | Example/default |
+| --- | --- | --- |
+| `APP_DOMAIN` | Caddy HTTPS hostname | `localhost` for smoke tests |
+| `PUBLIC_ORIGIN` | Matching browser origin used for CORS | `https://localhost` |
+| `HTTP_PORT` | Host HTTP/ACME port | `80` |
+| `HTTPS_PORT` | Host HTTPS and HTTP/3 port | `443` |
+| `IMAGE_PREFIX` | Image registry/repository prefix | `weather-lab` locally |
+| `IMAGE_TAG` | Exact API/web tag | `local` or immutable SHA |
+| `REDIS_PASSWORD_FILE_PATH` | Host path used as a Compose secret | `./secrets/redis_password.txt` |
+| `REDIS_MAXMEMORY` | Redis cache memory ceiling | `256mb` |
+
+The production web bundle uses an empty `VITE_API_BASE_URL`, making browser API
+requests relative to the public HTTPS origin. Build-time frontend values are not
+runtime secrets.
 

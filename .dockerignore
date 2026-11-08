@@ -8,5 +8,13 @@
 **/node_modules
 **/dist
 **/coverage
+.codex
+.agents
 .env
-
+.env.*
+apps/web/playwright-report
+apps/web/test-results
+apps/api/.coverage
+apps/api/coverage.xml
+secrets
+docs

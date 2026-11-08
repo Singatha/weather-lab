@@ -1,6 +1,6 @@
 # Testing strategy
 
-## Phase 6 checks
+## Automated checks
 
 The web suite uses Vitest, React Testing Library, and user-event to verify
 forecast rendering, loading, stale-data context, API retry, unit conversion,
@@ -45,6 +45,12 @@ catalog, and interpretation limits.
 
 Docker Compose configuration is validated separately so orchestration mistakes
 fail before containers are started.
+
+Phase 7 adds a production-stack CI job. It generates an ephemeral Redis secret,
+builds the production API and web targets, waits for Redis, API, web, and Caddy
+health checks, verifies the frontend and API through local HTTPS, and confirms
+that the public edge rejects `/metrics`. The secret and named volumes are removed
+when the job finishes.
 
 Ordinary tests do not make live Open-Meteo requests. Provider, API, component,
 and browser fixtures remain deterministic. The performance smoke uses real

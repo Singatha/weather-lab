@@ -130,7 +130,7 @@ async def test_openapi_includes_versioned_endpoints_and_rate_limit_responses(
 
     assert response.status_code == 200
     paths = response.json()["paths"]
-    assert response.json()["info"]["version"] == "0.6.0"
+    assert response.json()["info"]["version"] == "0.7.0"
     assert "/api/v1/locations/search" in paths
     assert "/api/v1/weather" in paths
     assert "429" in paths["/api/v1/weather"]["get"]["responses"]

@@ -1,4 +1,4 @@
-.PHONY: dev up down web-install web-dev web-test web-coverage web-e2e web-check api-install api-dev api-test api-coverage api-check performance-smoke compose-config
+.PHONY: dev up down web-install web-dev web-test web-coverage web-e2e web-check api-install api-dev api-test api-coverage api-check performance-smoke compose-config production-config production-up production-down
 
 dev: up
 
@@ -51,6 +51,16 @@ api-check:
 
 compose-config:
 	docker compose config --quiet
+	docker compose --env-file .env.production.example -f compose.production.yml config --quiet
+
+production-config:
+	docker compose --env-file .env.production -f compose.production.yml config --quiet
+
+production-up:
+	docker compose --env-file .env.production -f compose.production.yml up --detach --wait
+
+production-down:
+	docker compose --env-file .env.production -f compose.production.yml down
 
 performance-smoke:
 	docker compose exec -T api python -m performance.smoke --base-url http://127.0.0.1:8000

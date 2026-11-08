@@ -1,4 +1,4 @@
-# API contract — Phase 6
+# API contract — Phase 7
 
 All application endpoints return JSON. Interactive OpenAPI documentation is
 available at `/docs`, with the machine-readable schema at `/openapi.json`.
@@ -110,15 +110,17 @@ successfully cached weather response was written.
 
 Exceeded quotas return `429`, set `Retry-After`, and use the standard error
 envelope. Health and documentation endpoints are not rate limited. Client
-identity uses the direct socket address; trusted-proxy forwarding configuration
-belongs to the deployment phase.
+identity uses the proxy-normalized client address. The production API trusts
+forwarded headers because port 8000 is private and only the Caddy network can
+reach it; do not publish that port without narrowing the trusted proxy setting.
 
 ## `GET /metrics`
 
 Returns the Prometheus text exposition for HTTP latency and errors, cache
 operations, and provider outcomes/latency. This operational endpoint is not
 included in OpenAPI and is not rate limited. Deployment controls for restricting
-scrape access belong to Phase 7.
+scrape access is restricted by the production edge, which returns 404. Approved
+collectors must connect through the private service network.
 
 ## Error contract
 
